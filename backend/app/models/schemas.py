@@ -9,6 +9,7 @@ class RiskLevel(str, Enum):
     WATCH = "WATCH"
     HIGH_RISK = "HIGH_RISK"
     CRITICAL = "CRITICAL"
+    RISK_UNAVAILABLE = "RISK_UNAVAILABLE"
 
 
 class BatchStatus(str, Enum):
@@ -46,13 +47,22 @@ class PersonaListResponse(BaseModel):
 # Batch Schemas
 class BatchCreate(BaseModel):
     plant_id: str = "plant-001"
-    plant_name: str = "Ahmedabad Plant 01"
+    plant_name: str = "Ahmedabad Central Plant"
+    plant_lat: Optional[float] = 23.0225
+    plant_lng: Optional[float] = 72.5714
     project_id: str = "project-007"
     project_name: str = "Project Site 07"
+    project_lat: Optional[float] = 23.0900
+    project_lng: Optional[float] = 72.6100
+    concrete_grade: str = "M35"
     volume_m3: float = 6.0
     target_slump_mm: float = 105.0
     initial_slump_mm: float = 110.0
     batch_code: Optional[str] = None
+    dispatch_time: Optional[str] = "14:00"
+    requested_delivery_time: Optional[str] = "15:00"
+    admixture_retarder: Optional[str] = "None"
+    planned_transit_minutes: Optional[float] = 48.0
 
 
 class BatchDetail(BaseModel):
@@ -265,3 +275,54 @@ class FleetKPI(BaseModel):
     potential_loss_inr: float
     loss_avoided_inr: float
     freshness_seconds: int = 4
+
+
+# Authentication & RBAC Schemas
+class RoleSchema(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+
+
+class UserResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    organization: Optional[str] = None
+    roles: List[RoleSchema] = []
+    is_active: bool = True
+    created_at: Optional[str] = None
+
+
+class UserRegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    organization: Optional[str] = None
+    role_id: Optional[str] = None
+    role_ids: Optional[List[str]] = None
+
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class WorkspaceSummary(BaseModel):
+    id: str
+    name: str
+    tagline: str
+    description: str
+    is_flagship: bool = False
+    key_capability: Optional[str] = None
+    capabilities: List[str] = []
+    active_deliveries: int = 0
+    attention_count: int = 0
+    is_authorized: bool = True
+

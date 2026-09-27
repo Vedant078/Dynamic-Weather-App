@@ -9,7 +9,8 @@ void main() {
 
     // Verify brand header and landing hero presence
     expect(find.text('MAUSAM'), findsOneWidget);
-    expect(find.text('Get Started'), findsOneWidget);
+    expect(find.text('Explore Intelligence'), findsOneWidget);
+    expect(find.text('Get Started'), findsNothing);
     expect(find.text('Sign In'), findsOneWidget);
     expect(find.text('Built Around the Way You Use Weather'), findsOneWidget);
   });
@@ -22,8 +23,8 @@ void main() {
     await tester.pumpWidget(const MausamApp());
     await tester.pumpAndSettle();
 
-    // 1. Tap 'Get Started' on Landing
-    await tester.tap(find.text('Get Started'));
+    // 1. Tap 'Explore Intelligence' on Landing (Single Primary CTA)
+    await tester.tap(find.text('Explore Intelligence'));
     await tester.pumpAndSettle();
 
     // Verify Auth Screen (credentials only, NO persona selection!)
@@ -46,9 +47,9 @@ void main() {
     await tester.tap(launchBtn);
     await tester.pumpAndSettle();
 
-    // Verify Operational RMC App Loaded
+    // Verify Operational RMC App Loaded with isolated clean empty state
     expect(find.text('Ahmedabad Central Corridor'), findsOneWidget);
-    expect(find.text('RMC-204'), findsWidgets);
+    expect(find.text('No active deliveries'), findsOneWidget);
     expect(find.text('Active deliveries'), findsOneWidget);
   });
 
@@ -71,6 +72,7 @@ void main() {
 
     // Must be back on Hero!
     expect(find.text('Weather Intelligence\nfor Every Decision.'), findsOneWidget);
-    expect(find.text('Get Started'), findsOneWidget);
+    expect(find.text('Explore Intelligence'), findsOneWidget);
+    expect(find.text('Get Started'), findsNothing);
   });
 }

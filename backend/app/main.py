@@ -1,15 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api.routes import personas, rmc_batches, rmc_routes, rmc_risk, rmc_outcomes, simulation, weather
+from app.api.routes import (
+    auth, admin, personas, rmc_batches, rmc_routes, rmc_risk, rmc_outcomes, simulation, weather
+)
 from app.websocket import telemetry_stream
 from app.ml.model import model_manager
 
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Multi-Persona Weather Intelligence & RMC Logistics Risk Engine API",
-    version="1.0.0"
+    description="Multi-Persona Weather Intelligence & Real-Time RMC Logistics Decision Engine API",
+    version="2.0.0"
 )
 
 # Enable CORS for Flutter mobile / web clients
@@ -21,9 +23,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API Routers
+# Authentication & Admin Routers (available at both root and API_V1_PREFIX)
+app.include_router(auth.router)
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(admin.router)
+app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
+
+# Domain Routers
 app.include_router(personas.router, prefix=settings.API_V1_PREFIX)
+app.include_router(personas.router)
 app.include_router(rmc_batches.router, prefix=settings.API_V1_PREFIX)
+app.include_router(rmc_batches.router)  # Also expose /deliveries directly at root for standard REST paths
 app.include_router(rmc_routes.router, prefix=settings.API_V1_PREFIX)
 app.include_router(rmc_risk.router, prefix=settings.API_V1_PREFIX)
 app.include_router(rmc_outcomes.router, prefix=settings.API_V1_PREFIX)
@@ -39,7 +49,8 @@ def root():
         "status": "OPERATIONAL",
         "primary_engine": "Ready-Mix Concrete Transit Loss Prevention",
         "model_version": model_manager.version,
-        "docs_url": "/docs"
+        "docs_url": "/docs",
+        "openapi_url": "/openapi.json"
     }
 
 
@@ -49,8 +60,8 @@ def health_check():
         "status": "healthy",
         "ml_engine_ready": model_manager.gbr_model is not None,
         "models_evaluated": {
-            "gbr_mae": model_manager.metrics["gbr_mae"],
-            "rf_mae": model_manager.metrics["rf_mae"]
+            "gbr_mae": model_manager.metrics["gbr_mae"] if model_manager.metrics else None,
+            "rf_mae": model_manager.metrics["rf_mae"] if model_manager.metrics else None
         }
     }
 

@@ -18,7 +18,7 @@ void main() {
       // Verify core operational elements
       expect(find.text('MAUSAM'), findsOneWidget);
       expect(find.text('Ahmedabad Central Corridor'), findsOneWidget);
-      expect(find.text('RMC-204'), findsWidgets);
+      expect(find.text('No active deliveries'), findsOneWidget);
       expect(find.text('Active deliveries'), findsOneWidget);
       expect(find.text('Avoided loss'), findsOneWidget);
     });
@@ -33,7 +33,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('MAUSAM'), findsOneWidget);
-      expect(find.text('Get Started'), findsOneWidget);
+      expect(find.text('Explore Intelligence'), findsOneWidget);
+      expect(find.text('Get Started'), findsNothing);
       expect(find.text('Sign In'), findsOneWidget);
     });
 

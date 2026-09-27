@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mausam/features/rmc/batch_detail/batch_detail_screen.dart';
 import 'package:mausam/design_system/components/route_map_view.dart';
 import 'package:mausam/models/batch.dart';
+import 'package:mausam/services/mock_data_service.dart';
 import 'package:mausam/state/mausam_state.dart';
 
 void main() {
@@ -39,9 +40,8 @@ void main() {
 
       // 2. Verify Visual Anchor: RouteMapView is present with Legend
       expect(find.byType(RouteMapView), findsOneWidget);
-      expect(find.text('Traversed route'), findsOneWidget);
-      expect(find.text('Remaining route'), findsOneWidget);
-      expect(find.text('Risk bottleneck'), findsOneWidget);
+      expect(find.text('Route'), findsOneWidget);
+      expect(find.text('Hub'), findsOneWidget);
 
       // 3. Verify Linear Journey Progress Bar (Lesson 6)
       expect(find.textContaining('Elapsed:'), findsOneWidget);
@@ -94,6 +94,9 @@ void main() {
       tester.view.physicalSize = const Size(1200, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
+
+      // Populate batches to test fleet switching
+      state.batches.addAll(MockDataService.initialBatches);
 
       await tester.pumpWidget(
         MaterialApp(
