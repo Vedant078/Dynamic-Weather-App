@@ -310,8 +310,8 @@ class _MausamCorridorVisualizerState extends State<MausamCorridorVisualizer>
             child: _buildMetricTile(
               context,
               label: 'Protected Batch',
-              value: '₹1.68L',
-              sub: 'Avoided Reject',
+              value: 'Loss Avoided',
+              sub: 'Dynamic Prevention',
               icon: MausamIcons.currencyRupee,
               alertColor: const Color(0xFF059669),
             ),

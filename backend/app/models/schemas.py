@@ -326,3 +326,34 @@ class WorkspaceSummary(BaseModel):
     attention_count: int = 0
     is_authorized: bool = True
 
+
+class LocationCreateRequest(BaseModel):
+    name: str
+    type: str  # "PLANT", "PROJECT_SITE", "DESTINATION"
+    address: Optional[str] = None
+    latitude: float
+    longitude: float
+
+
+class LocationUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class LocationResponse(BaseModel):
+    id: str
+    name: str
+    type: str
+    address: Optional[str] = None
+    latitude: float
+    longitude: float
+    organization: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+

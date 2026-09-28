@@ -51,7 +51,7 @@ class SimulationSheet extends StatelessWidget {
       {'num': 1, 'title': 'Traffic Delay', 'desc': 'Nana Chiloda bottleneck building'},
       {'num': 2, 'title': 'Risk Escalation', 'desc': 'Heat + rain surge; transit > 78m limit'},
       {'num': 3, 'title': 'Route B Reroute', 'desc': 'Airport Bypass applied; risk mitigated'},
-      {'num': 4, 'title': 'Site Arrival', 'desc': 'Delivery verified, ₹1.68L loss avoided'},
+      {'num': 4, 'title': 'Site Arrival', 'desc': 'Delivery verified, batch loss avoided'},
     ];
 
     final isDark = MausamColors.isDark(context);

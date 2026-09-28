@@ -5,6 +5,7 @@ import '../models/route_option.dart';
 import '../models/delivery_outcome.dart';
 import '../models/delivery_order_draft.dart';
 import '../models/workspace_definition.dart';
+import '../models/saved_location.dart';
 import '../services/api_service.dart';
 import '../services/mock_data_service.dart';
 import '../services/risk_engine_service.dart';
@@ -26,6 +27,7 @@ class MausamState extends ChangeNotifier {
   late BatchModel _selectedBatch;
   final List<RouteOptionModel> _routes = List.from(MockDataService.routesForBatch204);
   final List<DeliveryOutcomeModel> _outcomes = [];
+  List<SavedLocation> _savedLocations = [];
   
   int _simulationStep = 0;
   String _simulationNarrative = 'Truck in transit on Route A. Concrete hydration and temperature within safe baseline envelope.';
@@ -87,6 +89,9 @@ class MausamState extends ChangeNotifier {
 
   List<BatchModel> get batches => _batches;
   BatchModel get selectedBatch => _selectedBatch;
+  List<SavedLocation> get savedLocations => _savedLocations;
+  List<SavedLocation> get savedPlants => _savedLocations.where((l) => l.isPlant).toList();
+  List<SavedLocation> get savedProjectSites => _savedLocations.where((l) => l.isProjectSite || l.isDestination).toList();
   List<RouteOptionModel> get routes => _routes;
   List<DeliveryOutcomeModel> get outcomes => _outcomes;
   int get simulationStep => _simulationStep;
@@ -208,6 +213,7 @@ class MausamState extends ChangeNotifier {
       _userRoleIds = rolesList?.map((r) => (r is Map ? r['id'] : r).toString()).toList() ?? ['rmc'];
       _batches = [];
       await loadBatches();
+      await loadLocations();
       return true;
     } catch (e) {
       _authError = e.toString().replaceAll('Exception: ', '');
@@ -250,6 +256,7 @@ class MausamState extends ChangeNotifier {
       _userRoleIds = rolesList?.map((r) => (r is Map ? r['id'] : r).toString()).toList() ?? ['rmc'];
       _batches = [];
       await loadBatches();
+      await loadLocations();
       return true;
     } catch (e) {
       _authError = e.toString().replaceAll('Exception: ', '');
@@ -271,6 +278,7 @@ class MausamState extends ChangeNotifier {
     _userOrganization = null;
     _userRoleIds = [];
     _batches = [];
+    _savedLocations.clear();
     _outcomes.clear();
     _themeMode = ThemeMode.light;
     _currentScreen = 'landing';
@@ -323,6 +331,7 @@ class MausamState extends ChangeNotifier {
       }
 
       await loadBatches();
+      await loadLocations();
     } catch (_) {}
     _isLoading = false;
     _lastUpdated = DateTime.now();
@@ -339,6 +348,113 @@ class MausamState extends ChangeNotifier {
       notifyListeners();
     } catch (_) {}
   }
+
+  Future<void> loadLocations() async {
+    try {
+      final fetched = await _apiService.fetchLocations();
+      if (fetched.isNotEmpty) {
+        _savedLocations = fetched;
+      } else {
+        // Standard regional presets if none are saved yet in account
+        _savedLocations = [
+          const SavedLocation(
+            id: 'plant-naroda',
+            name: 'Ahmedabad Plant 01 (Naroda)',
+            type: 'PLANT',
+            address: 'GIDC Industrial Estate, Naroda',
+            latitude: 23.0650,
+            longitude: 72.6500,
+          ),
+          const SavedLocation(
+            id: 'plant-sanand',
+            name: 'Ahmedabad Plant 02 - Sanand',
+            type: 'PLANT',
+            address: 'Sanand Industrial Corridor',
+            latitude: 22.9850,
+            longitude: 72.3780,
+          ),
+          const SavedLocation(
+            id: 'plant-gandhinagar',
+            name: 'Gandhinagar Plant 03',
+            type: 'PLANT',
+            address: 'Sector 26, Infocity Road',
+            latitude: 23.1950,
+            longitude: 72.6350,
+          ),
+          const SavedLocation(
+            id: 'site-gift-city',
+            name: 'Gift City Tower B',
+            type: 'PROJECT_SITE',
+            address: 'GIFT City Special Economic Zone',
+            latitude: 23.1600,
+            longitude: 72.6850,
+          ),
+          const SavedLocation(
+            id: 'site-thaltej',
+            name: 'Metro Pier 142 - Thaltej',
+            type: 'PROJECT_SITE',
+            address: 'Drive-In Road / SG Highway Junction',
+            latitude: 23.0510,
+            longitude: 72.5180,
+          ),
+          const SavedLocation(
+            id: 'site-riverfront',
+            name: 'Riverfront Phase 2',
+            type: 'PROJECT_SITE',
+            address: 'Sabarmati Riverfront Promenade',
+            latitude: 23.0320,
+            longitude: 72.5740,
+          ),
+          const SavedLocation(
+            id: 'site-ring-road',
+            name: 'Ring Road Overbridge',
+            type: 'PROJECT_SITE',
+            address: 'SP Ring Road Junction 7',
+            latitude: 23.1150,
+            longitude: 72.5480,
+          ),
+        ];
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<SavedLocation?> addLocation({
+    required String name,
+    required String type,
+    String? address,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final created = await _apiService.createLocation(
+      name: name,
+      type: type,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    final newLoc = created ?? SavedLocation(
+      id: 'loc-${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      type: type,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+      createdAt: DateTime.now(),
+    );
+    _savedLocations.insert(0, newLoc);
+    notifyListeners();
+    return newLoc;
+  }
+
+  Future<bool> deleteLocation(String id) async {
+    final success = await _apiService.deleteLocation(id);
+    _savedLocations.removeWhere((l) => l.id == id);
+    notifyListeners();
+    return success;
+  }
+
+  ApiService get apiService => _apiService;
 
   void setPersona(String personaId) {
     if (_selectedPersonaId != personaId) {
@@ -484,12 +600,12 @@ class MausamState extends ChangeNotifier {
         riskFactors: [
           'Site slump confirmed at 101.5 mm (Target: 105 mm)',
           'Transit completed in 66 min (within 78 min limit)',
-          'Avoided batch loss: ₹1.68 Lakhs',
+          'Avoided batch loss: ₹71,820',
         ],
         recommendedAction: null,
         activeRouteId: 'route-b',
       );
-      _simulationNarrative = 'Batch arrived at Project Site 07. Slump verified at 101.5 mm. Delivery accepted. Avoided financial loss of ₹1.68 Lakhs recorded.';
+      _simulationNarrative = 'Batch arrived at Project Site 07. Slump verified at 101.5 mm. Delivery accepted. Avoided batch loss of ₹71,820 recorded.';
     }
 
     // Update in batches list
@@ -557,10 +673,14 @@ class MausamState extends ChangeNotifier {
     );
     return DeliveryOrderDraft(
       batchCode: 'RMC-$nextNumber',
-      plantId: 'plant-001',
-      plantName: 'Ahmedabad Plant 01',
-      projectId: 'project-007',
-      projectName: 'Gift City Tower B',
+      plantId: 'area-ahmedabad',
+      plantName: 'Ahmedabad',
+      projectId: 'area-gandhinagar',
+      projectName: 'Gandhinagar',
+      plantLat: 23.0225,
+      plantLng: 72.5714,
+      projectLat: 23.2156,
+      projectLng: 72.6369,
       concreteGrade: 'M35',
       volumeM3: 6.0,
       initialSlumpMm: 120.0,
@@ -584,10 +704,14 @@ class MausamState extends ChangeNotifier {
     );
     _currentDraft = DeliveryOrderDraft(
       batchCode: 'RMC-$nextNumber',
-      plantId: 'plant-001',
-      plantName: 'Ahmedabad Plant 01',
-      projectId: 'project-007',
-      projectName: 'Gift City Tower B',
+      plantId: 'area-ahmedabad',
+      plantName: 'Ahmedabad',
+      projectId: 'area-gandhinagar',
+      projectName: 'Gandhinagar',
+      plantLat: 23.0225,
+      plantLng: 72.5714,
+      projectLat: 23.2156,
+      projectLng: 72.6369,
       concreteGrade: 'M35',
       volumeM3: 6.0,
       initialSlumpMm: 120.0,
@@ -625,10 +749,35 @@ class MausamState extends ChangeNotifier {
     notifyListeners();
 
     try {
+      LocationPoint? customOrigin;
+      LocationPoint? customDestination;
+      if (targetDraft.plantLat != null && targetDraft.plantLng != null) {
+        customOrigin = LocationPoint(
+          id: targetDraft.plantId,
+          name: targetDraft.plantName,
+          shortName: targetDraft.plantName,
+          latitude: targetDraft.plantLat!,
+          longitude: targetDraft.plantLng!,
+          isPlant: true,
+        );
+      }
+      if (targetDraft.projectLat != null && targetDraft.projectLng != null) {
+        customDestination = LocationPoint(
+          id: targetDraft.projectId,
+          name: targetDraft.projectName,
+          shortName: targetDraft.projectName,
+          latitude: targetDraft.projectLat!,
+          longitude: targetDraft.projectLng!,
+          isPlant: false,
+        );
+      }
+
       final route = RouteService.getRoute(
         originName: targetDraft.plantName,
         destinationName: targetDraft.projectName,
         preferredRouteId: targetDraft.selectedRouteId,
+        customOrigin: customOrigin,
+        customDestination: customDestination,
       );
 
       // Execute authoritative RMC risk calculation on FastAPI Backend (PRD Section 1)
@@ -704,10 +853,35 @@ class MausamState extends ChangeNotifier {
   ]) async {
     final targetDraft = draft ?? currentDraft;
     final targetRisk = risk ?? _currentDraftRisk ?? await calculateDeliveryRisk(targetDraft);
+    LocationPoint? customOrigin;
+    LocationPoint? customDestination;
+    if (targetDraft.plantLat != null && targetDraft.plantLng != null) {
+      customOrigin = LocationPoint(
+        id: targetDraft.plantId,
+        name: targetDraft.plantName,
+        shortName: targetDraft.plantName,
+        latitude: targetDraft.plantLat!,
+        longitude: targetDraft.plantLng!,
+        isPlant: true,
+      );
+    }
+    if (targetDraft.projectLat != null && targetDraft.projectLng != null) {
+      customDestination = LocationPoint(
+        id: targetDraft.projectId,
+        name: targetDraft.projectName,
+        shortName: targetDraft.projectName,
+        latitude: targetDraft.projectLat!,
+        longitude: targetDraft.projectLng!,
+        isPlant: false,
+      );
+    }
+
     final routeAssessment = RouteService.getRoute(
       originName: targetDraft.plantName,
       destinationName: targetDraft.projectName,
       preferredRouteId: targetDraft.selectedRouteId,
+      customOrigin: customOrigin,
+      customDestination: customDestination,
     );
 
     final double etaMin = targetRisk.predictedTransitMinutes > 0
@@ -721,6 +895,10 @@ class MausamState extends ChangeNotifier {
       'plant_name': targetDraft.plantName,
       'project_id': targetDraft.projectId,
       'project_name': targetDraft.projectName,
+      'plant_lat': targetDraft.plantLat,
+      'plant_lng': targetDraft.plantLng,
+      'project_lat': targetDraft.projectLat,
+      'project_lng': targetDraft.projectLng,
       'concrete_grade': targetDraft.concreteGrade,
       'volume_m3': targetDraft.volumeM3,
       'target_slump_mm': targetDraft.targetSlumpMm,

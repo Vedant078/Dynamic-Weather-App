@@ -162,14 +162,30 @@ class DeliveryRepository:
         outcome_str = outcome_data["outcome"]
         site_slump = float(outcome_data["site_slump_mm"])
         transit_min = float(outcome_data["actual_transit_minutes"])
-        conc_temp = float(outcome_data["site_concrete_temp_c"])
+        conc_temp = float(outcome_data.get("site_concrete_temp_c", 32.0))
         rejection_reason = outcome_data.get("rejection_reason")
-
+        delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
         is_rejected = outcome_str.lower() == "rejected"
-        financial_impact = 241000.0 if is_rejected else 168000.0
-        financial_type = "MATERIAL_LOSS" if is_rejected else "AVOIDED_LOSS"
-        quality_grade = "REJECTED_UNUSABLE" if is_rejected else "HIGH_SPEC_DELIVERY"
-        slump_variance = site_slump - 110.0
+
+        from app.services.financial_service import RmcFinancialEngine
+        vol = delivery.volume_m3 if delivery else 6.0
+        grade = delivery.concrete_grade if delivery else "M35"
+        dist = delivery.total_distance_km if delivery else 25.0
+        has_int = bool(delivery and getattr(delivery, 'active_route_id', '') == 'route-b')
+
+        fin = RmcFinancialEngine.calculate_delivery_economics(
+            volume_m3=vol,
+            concrete_grade=grade,
+            total_distance_km=dist,
+            actual_transit_minutes=transit_min,
+            outcome=outcome_str,
+            has_intervention=has_int
+        )
+        financial_impact = fin["financial_impact_inr"]
+        financial_type = fin["financial_type"]
+        quality_grade = "REJECTED_UNUSABLE" if is_rejected else ("ACCEPTABLE_SUB_OPTIMAL" if "warning" in outcome_str else "HIGH_SPEC_DELIVERY")
+        initial_s = delivery.initial_slump_mm if delivery else 110.0
+        slump_variance = round(site_slump - initial_s, 1)
 
         existing = db.query(DeliveryOutcome).filter(DeliveryOutcome.delivery_id == delivery_id).first()
         if existing:

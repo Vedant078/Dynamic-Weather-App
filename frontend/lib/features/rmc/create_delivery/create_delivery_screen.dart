@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/mausam_colors.dart';
+import '../../../core/theme/mausam_icons.dart';
 import '../../../core/theme/mausam_spacing.dart';
 import '../../../core/theme/mausam_typography.dart';
 import '../../../models/batch.dart';
@@ -8,6 +9,9 @@ import '../../../models/delivery_order_draft.dart';
 import '../../../state/mausam_state.dart';
 import '../../../design_system/components/status_pill.dart';
 import '../../../design_system/components/route_map_view.dart';
+import '../../../models/area.dart';
+import '../../../services/area_service.dart';
+import '../../../design_system/components/searchable_area_dropdown.dart';
 import '../../../services/route_service.dart';
 
 class CreateDeliveryScreen extends StatefulWidget {
@@ -31,8 +35,10 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   late TextEditingController _dispatchTimeController;
 
   // Selected values
-  String _selectedPlant = 'Ahmedabad Plant 01';
-  String _selectedProject = 'Gift City Tower B';
+  String _originAreaId = 'area-ahmedabad';
+  String _selectedPlant = 'Ahmedabad';
+  String _destinationAreaId = 'area-gandhinagar';
+  String _selectedProject = 'Gandhinagar';
   String _selectedGrade = 'M35';
   String _dispatchTime = '14:00';
   double _initialSlumpMm = 120.0;
@@ -49,19 +55,36 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   bool _showTransitTuner = false;
   bool _isRecalculatingRoute = false;
 
-  // Available plants & projects
-  final List<String> _plants = [
-    'Ahmedabad Plant 01',
-    'Ahmedabad Plant 02 - Sanand',
-    'Gandhinagar Plant 03',
-  ];
+  Area? get _originArea => AreaService.getAreaById(_originAreaId) ?? AreaService.findAreaByName(_selectedPlant);
+  Area? get _destinationArea => AreaService.getAreaById(_destinationAreaId) ?? AreaService.findAreaByName(_selectedProject);
 
-  final List<String> _projects = [
-    'Gift City Tower B',
-    'Metro Pier 142 - Thaltej',
-    'Riverfront Phase 2',
-    'Ring Road Overbridge',
-  ];
+
+  LocationPoint _getPlantPoint(String name) {
+    final area = _originArea ?? AreaService.findAreaByName(name);
+    if (area != null) {
+      return LocationPoint.fromArea(area, isPlant: true);
+    }
+    try {
+      final loc = widget.state.savedPlants.firstWhere((p) => p.name == name);
+      return loc.toLocationPoint();
+    } catch (_) {
+      return RouteService.resolvePlant(name);
+    }
+  }
+
+  LocationPoint _getProjectPoint(String name) {
+    final area = _destinationArea ?? AreaService.findAreaByName(name);
+    if (area != null) {
+      return LocationPoint.fromArea(area, isPlant: false);
+    }
+    try {
+      final loc = widget.state.savedProjectSites.firstWhere((p) => p.name == name);
+      return loc.toLocationPoint();
+    } catch (_) {
+      return RouteService.resolveProject(name);
+    }
+  }
+
 
   final List<Map<String, String>> _gradeDefinitions = [
     {'grade': 'M20', 'label': 'Foundation / Low Heat'},
@@ -90,8 +113,36 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     _volumeController = TextEditingController(text: draft.volumeM3.toStringAsFixed(1));
     _dispatchTime = draft.dispatchTime;
     _dispatchTimeController = TextEditingController(text: _dispatchTime);
-    _selectedPlant = draft.plantName;
-    _selectedProject = draft.projectName;
+    
+    // Dynamic Area Initialization (Section 4 & 8)
+    if (draft.plantId.isNotEmpty && AreaService.getAreaById(draft.plantId) != null) {
+      _originAreaId = draft.plantId;
+      _selectedPlant = draft.plantName;
+    } else {
+      final found = AreaService.findAreaByName(draft.plantName);
+      if (found != null) {
+        _originAreaId = found.id;
+        _selectedPlant = found.name;
+      } else {
+        _originAreaId = 'area-ahmedabad';
+        _selectedPlant = 'Ahmedabad';
+      }
+    }
+
+    if (draft.projectId.isNotEmpty && AreaService.getAreaById(draft.projectId) != null) {
+      _destinationAreaId = draft.projectId;
+      _selectedProject = draft.projectName;
+    } else {
+      final found = AreaService.findAreaByName(draft.projectName);
+      if (found != null) {
+        _destinationAreaId = found.id;
+        _selectedProject = found.name;
+      } else {
+        _destinationAreaId = 'area-gandhinagar';
+        _selectedProject = 'Gandhinagar';
+      }
+    }
+
     _selectedGrade = draft.concreteGrade;
     _initialSlumpMm = draft.initialSlumpMm;
     _targetSlumpMm = draft.targetSlumpMm;
@@ -103,10 +154,15 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     _customTransitMinutes = draft.plannedTransitMinutes;
     _customDelayMinutes = draft.expectedDelayMin;
 
+    final plantPoint = _getPlantPoint(_selectedPlant);
+    final projectPoint = _getProjectPoint(_selectedProject);
+
     final route = RouteService.getRoute(
       originName: _selectedPlant,
       destinationName: _selectedProject,
       preferredRouteId: _selectedRouteId,
+      customOrigin: plantPoint,
+      customDestination: projectPoint,
     );
     final double delay = _customDelayMinutes ?? route.expectedDelayMin;
     final double baseTransit = _customTransitMinutes ?? route.baseTransitMinutes;
@@ -122,10 +178,15 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   }
 
   void _updateWeatherFromCanonical() {
+    final plantPoint = _getPlantPoint(_selectedPlant);
+    final projectPoint = _getProjectPoint(_selectedProject);
+
     final route = RouteService.getRoute(
       originName: _selectedPlant,
       destinationName: _selectedProject,
       preferredRouteId: _selectedRouteId,
+      customOrigin: plantPoint,
+      customDestination: projectPoint,
     );
     final double delay = _customDelayMinutes ?? route.expectedDelayMin;
     final double baseTransit = _customTransitMinutes ?? route.baseTransitMinutes;
@@ -143,20 +204,45 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     });
   }
 
-  Future<void> _handleLocationChanged({String? newPlant, String? newProject}) async {
+  Future<void> _handleLocationChanged({
+    Area? newOriginArea,
+    Area? newDestinationArea,
+    String? newPlant,
+    String? newProject,
+  }) async {
     setState(() {
       _isRecalculatingRoute = true;
-      if (newPlant != null) _selectedPlant = newPlant;
-      if (newProject != null) _selectedProject = newProject;
+      if (newOriginArea != null) {
+        _originAreaId = newOriginArea.id;
+        _selectedPlant = newOriginArea.qualifiedName;
+      } else if (newPlant != null) {
+        _selectedPlant = newPlant;
+        final matched = AreaService.findAreaByName(newPlant);
+        if (matched != null) _originAreaId = matched.id;
+      }
+
+      if (newDestinationArea != null) {
+        _destinationAreaId = newDestinationArea.id;
+        _selectedProject = newDestinationArea.qualifiedName;
+      } else if (newProject != null) {
+        _selectedProject = newProject;
+        final matched = AreaService.findAreaByName(newProject);
+        if (matched != null) _destinationAreaId = matched.id;
+      }
     });
 
-    // Invalidate route and show "CALCULATING ROUTE..." (Section 6)
+    // Invalidate route and show "Calculating route..." (Section 13)
     await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
+
+    final plantPoint = _getPlantPoint(_selectedPlant);
+    final projectPoint = _getProjectPoint(_selectedProject);
 
     final candidates = RouteService.getCandidateRoutes(
       originName: _selectedPlant,
       destinationName: _selectedProject,
+      customOrigin: plantPoint,
+      customDestination: projectPoint,
     );
 
     final candidateIds = candidates.map((c) => c.routeId).toList();
@@ -198,11 +284,14 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     final double delay = _customDelayMinutes ?? defaultDelay;
     final double baseTransit = _customTransitMinutes ?? route.etaMinutes.toDouble();
 
+    final plantPoint = _getPlantPoint(_selectedPlant);
+    final projectPoint = _getProjectPoint(_selectedProject);
+
     final draft = DeliveryOrderDraft(
       batchCode: _batchCodeController.text.trim().isEmpty ? 'RMC-205' : _batchCodeController.text.trim(),
-      plantId: 'plant-${_selectedPlant.hashCode.abs()}',
+      plantId: _originAreaId,
       plantName: _selectedPlant,
-      projectId: 'proj-${_selectedProject.hashCode.abs()}',
+      projectId: _destinationAreaId,
       projectName: _selectedProject,
       volumeM3: vol,
       concreteGrade: _selectedGrade,
@@ -217,6 +306,10 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       dispatchTime: _dispatchTime,
       plannedTransitMinutes: baseTransit,
       expectedDelayMin: delay,
+      plantLat: plantPoint.latitude,
+      plantLng: plantPoint.longitude,
+      projectLat: projectPoint.latitude,
+      projectLng: projectPoint.longitude,
     );
     widget.state.updateDeliveryDraft(draft);
   }
@@ -561,68 +654,50 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Dispatch Plant (Origin) *', style: MausamTypography.microOf(context).copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedPlant,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(MausamSpacing.radiusControls),
-                          borderSide: BorderSide(color: MausamColors.brd(context)),
-                        ),
-                      ),
-                      items: _plants.map((p) => DropdownMenuItem(value: p, child: Text(p, style: MausamTypography.bodyMediumOf(context)))).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          _handleLocationChanged(newPlant: val);
-                        }
-                      },
-                    ),
-                  ],
+          SearchableAreaDropdown(
+            label: 'PLANT / ORIGIN',
+            pickerTitle: 'Select Origin Area',
+            hint: 'Select dispatch origin area',
+            selectedArea: _originArea ??
+                Area(
+                  id: _originAreaId,
+                  name: _selectedPlant,
+                  city: _selectedPlant,
+                  state: 'Gujarat',
+                  country: 'India',
+                  latitude: _getPlantPoint(_selectedPlant).latitude,
+                  longitude: _getPlantPoint(_selectedPlant).longitude,
                 ),
-              ),
-            ],
+            icon: MausamIcons.plant,
+            isRequired: true,
+            onChanged: (area) {
+              if (area != null) {
+                _handleLocationChanged(newOriginArea: area);
+              }
+            },
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Project Site (Destination) *', style: MausamTypography.microOf(context).copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedProject,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(MausamSpacing.radiusControls),
-                          borderSide: BorderSide(color: MausamColors.brd(context)),
-                        ),
-                      ),
-                      items: _projects.map((p) => DropdownMenuItem(value: p, child: Text(p, style: MausamTypography.bodyMediumOf(context)))).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          _handleLocationChanged(newProject: val);
-                        }
-                      },
-                    ),
-                  ],
+          SearchableAreaDropdown(
+            label: 'PROJECT SITE / DESTINATION',
+            pickerTitle: 'Select Destination Area',
+            hint: 'Select project destination area',
+            selectedArea: _destinationArea ??
+                Area(
+                  id: _destinationAreaId,
+                  name: _selectedProject,
+                  city: _selectedProject,
+                  state: 'Gujarat',
+                  country: 'India',
+                  latitude: _getProjectPoint(_selectedProject).latitude,
+                  longitude: _getProjectPoint(_selectedProject).longitude,
                 ),
-              ),
-            ],
+            icon: MausamIcons.project,
+            isRequired: true,
+            onChanged: (area) {
+              if (area != null) {
+                _handleLocationChanged(newDestinationArea: area);
+              }
+            },
           ),
           const SizedBox(height: 14),
 
@@ -913,9 +988,14 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   // SECTION 03: ROUTE & CORRIDOR SELECTION + TRANSIT TUNER
   // ===========================================================================
   Widget _buildRouteSection(BuildContext context) {
+    final plantPoint = _getPlantPoint(_selectedPlant);
+    final projectPoint = _getProjectPoint(_selectedProject);
+
     final candidates = RouteService.getCandidateRoutes(
       originName: _selectedPlant,
       destinationName: _selectedProject,
+      customOrigin: plantPoint,
+      customDestination: projectPoint,
     );
 
     return Container(
@@ -960,6 +1040,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
             originName: _selectedPlant,
             destinationName: _selectedProject,
             activeRouteId: _selectedRouteId,
+            customOrigin: plantPoint,
+            customDestination: projectPoint,
             isCalculating: _isRecalculatingRoute,
             height: 220,
             showLegend: false,

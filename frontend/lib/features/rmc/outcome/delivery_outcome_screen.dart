@@ -215,11 +215,35 @@ class _DeliveryOutcomeScreenState extends State<DeliveryOutcomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 1),
-                            Text(
-                              _selectedOutcome == 'rejected'
-                                  ? '₹2.41 Lakhs (Material & Truck Transit)'
-                                  : '₹1.68 Lakhs (Prevented transit failure)',
-                              style: MausamTypography.labelBoldOf(context).copyWith(fontSize: 12.5),
+                            Builder(
+                              builder: (context) {
+                                final double vol = batch.volumeM3;
+                                final String grade = batch.concreteGrade;
+                                final double rate = (grade == 'M15')
+                                    ? 3600.0
+                                    : ((grade == 'M20')
+                                        ? 3950.0
+                                        : ((grade == 'M25')
+                                            ? 4350.0
+                                            : ((grade == 'M30')
+                                                ? 4800.0
+                                                : ((grade == 'M35') ? 5300.0 : 5900.0))));
+                                final double dist = batch.totalDistanceKm;
+                                final double materialVal = vol * rate;
+                                final double transportVal = dist * 75.0;
+                                final double disposalVal = vol * 850.0;
+                                final double totalLossInr = materialVal * 2.0 + transportVal + disposalVal;
+                                final double avoidedLossInr = totalLossInr - 1500.0;
+
+                                final String financialText = _selectedOutcome == 'rejected'
+                                    ? '₹${(totalLossInr / 100000.0).toStringAsFixed(2)} Lakhs (Material, Disposal & Transit)'
+                                    : '₹${(avoidedLossInr / 100000.0).toStringAsFixed(2)} Lakhs (Prevented transit failure)';
+
+                                return Text(
+                                  financialText,
+                                  style: MausamTypography.labelBoldOf(context).copyWith(fontSize: 12.5),
+                                );
+                              },
                             ),
                           ],
                         ),

@@ -28,8 +28,8 @@ class DeliveryOutcomeModel {
       outcome: json['outcome'] as String,
       qualityGrade: json['quality_grade'] as String? ?? 'HIGH_SPEC_DELIVERY',
       slumpVarianceMm: (json['slump_variance_mm'] as num?)?.toDouble() ?? 0.0,
-      financialImpactInr: (json['financial_impact_inr'] as num?)?.toDouble() ?? 168000.0,
-      financialType: json['financial_type'] as String? ?? 'AVOIDED_LOSS',
+      financialImpactInr: (json['financial_impact_inr'] as num?)?.toDouble() ?? 0.0,
+      financialType: json['financial_type'] as String? ?? 'NOMINAL_DELIVERY',
       mlTrainingRecorded: json['ml_training_recorded'] as bool? ?? true,
       recordedAt: json['recorded_at'] as String? ?? DateTime.now().toIso8601String(),
     );

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.routes import (
-    auth, admin, personas, rmc_batches, rmc_routes, rmc_risk, rmc_outcomes, simulation, weather
+    auth, admin, personas, rmc_batches, rmc_routes, rmc_risk, rmc_outcomes, simulation, weather, locations
 )
 from app.websocket import telemetry_stream
 from app.ml.model import model_manager
@@ -32,6 +32,8 @@ app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 # Domain Routers
 app.include_router(personas.router, prefix=settings.API_V1_PREFIX)
 app.include_router(personas.router)
+app.include_router(locations.router, prefix=settings.API_V1_PREFIX)
+app.include_router(locations.router)
 app.include_router(rmc_batches.router, prefix=settings.API_V1_PREFIX)
 app.include_router(rmc_batches.router)  # Also expose /deliveries directly at root for standard REST paths
 app.include_router(rmc_routes.router, prefix=settings.API_V1_PREFIX)

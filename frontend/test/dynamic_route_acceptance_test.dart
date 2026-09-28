@@ -229,5 +229,41 @@ void main() {
       expect(find.text(dispatched.projectName), findsWidgets);
       expect(find.byType(RouteMapView), findsOneWidget);
     });
+
+    test('TEST 7: Custom Location with arbitrary coordinates generates dynamic route and canvas points', () {
+      const customPlant = LocationPoint(
+        id: 'loc-custom-plant',
+        name: 'Custom Plant Alpha',
+        shortName: 'Plant Alpha',
+        latitude: 23.0100,
+        longitude: 72.5000,
+        isPlant: true,
+      );
+      const customProject = LocationPoint(
+        id: 'loc-custom-project',
+        name: 'Custom Site Beta',
+        shortName: 'Site Beta',
+        latitude: 23.2500,
+        longitude: 72.7000,
+        isPlant: false,
+      );
+
+      final route = RouteService.getRoute(
+        originName: customPlant.name,
+        destinationName: customProject.name,
+        customOrigin: customPlant,
+        customDestination: customProject,
+      );
+
+      expect(route.origin.id, equals('loc-custom-plant'));
+      expect(route.destination.id, equals('loc-custom-project'));
+      expect(route.origin.latitude, equals(23.0100));
+      expect(route.destination.latitude, equals(23.2500));
+      expect(route.distanceKm, greaterThan(20.0));
+      expect(route.primaryPathPoints.first.x, equals(route.originPoint.x));
+      expect(route.primaryPathPoints.first.y, equals(route.originPoint.y));
+      expect(route.primaryPathPoints.last.x, equals(route.destinationPoint.x));
+      expect(route.primaryPathPoints.last.y, equals(route.destinationPoint.y));
+    });
   });
 }

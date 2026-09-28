@@ -146,7 +146,7 @@ class RiskEngineService {
         primaryDriver: 'Missing critical input telemetry: ${validationErrors.join("; ")}',
         contributingFactors: validationErrors,
         recommendedAction: 'RESCHEDULE_BATCH',
-        estimatedLossExposure: draft.volumeM3 * 28000.0,
+        estimatedLossExposure: 0.0,
         predictedTransitMinutes: 0.0,
         etaDelayMinutes: 0.0,
         selectedRouteName: route.routeName,
@@ -462,7 +462,20 @@ class RiskEngineService {
       recommendedAction = 'CALCULATE_NEW_ROUTE';
     }
 
-    final lossExposure = draft.volumeM3 * 28000.0;
+    final double rate = (grade == 'M15')
+        ? 3600.0
+        : ((grade == 'M20')
+            ? 3950.0
+            : ((grade == 'M25')
+                ? 4350.0
+                : ((grade == 'M30')
+                    ? 4800.0
+                    : ((grade == 'M35') ? 5300.0 : 5900.0))));
+    final double materialVal = draft.volumeM3 * rate;
+    final double transportVal = route.distanceKm * 75.0;
+    final double disposalVal = draft.volumeM3 * 850.0;
+    final double fullLossLiability = (materialVal * 2.0) + transportVal + disposalVal;
+    final double lossExposure = fullLossLiability * (compositeRisk.clamp(0.0, 100.0) / 100.0);
 
     return DeliveryRiskAssessment(
       predictedSlumpMm: predictedSlumpMm,

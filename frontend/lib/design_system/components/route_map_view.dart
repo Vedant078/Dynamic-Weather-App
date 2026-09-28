@@ -9,12 +9,14 @@ import '../../services/route_service.dart';
 
 /// Technical Live Route Map View for MAUSAM RMC Tracking.
 /// Visual Anchor implementing Horizon Fleet Route Tracking Reference:
-/// - Cartographic coordinate grid & geographic corridor (Ahmedabad - Gandhinagar)
+/// - Cartographic coordinate grid & dynamic geographic corridor
+/// - Auto-fits viewport to selected route geometry (Section 8)
+/// - Empty state before selection (Section 16)
+/// - Loading state "Calculating route..." (Section 17)
+/// - Error state with retry (Section 18)
 /// - Traversed path (solid) vs. Remaining path (dashed forward trajectory)
-/// - Risk bottleneck highlight zone (Corridor-specific congestion)
-/// - Alternate bypass route (Expressway or Outer Ring Bypass)
 /// - Vector truck position marker with directional heading & state color
-/// - On-map floating operational telemetry HUD
+/// - On-map floating operational telemetry HUD (Distance, ETA, Weather)
 /// - Standard map legend (Traversed, Remaining, Bottleneck, Bypass, Hubs)
 /// - Strictly location-driven from canonical RouteAssessment (PRD & Section 3-7)
 class RouteMapView extends StatelessWidget {
@@ -23,7 +25,13 @@ class RouteMapView extends StatelessWidget {
   final String? destinationName;
   final String? activeRouteId;
   final RouteAssessment? routeAssessment;
+  final LocationPoint? customOrigin;
+  final LocationPoint? customDestination;
   final bool isCalculating;
+  final bool isEmpty;
+  final bool hasError;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
   final bool isInteractive;
   final double height;
   final VoidCallback? onExpand;
@@ -39,7 +47,13 @@ class RouteMapView extends StatelessWidget {
     this.destinationName,
     this.activeRouteId,
     this.routeAssessment,
+    this.customOrigin,
+    this.customDestination,
     this.isCalculating = false,
+    this.isEmpty = false,
+    this.hasError = false,
+    this.errorMessage,
+    this.onRetry,
     this.isInteractive = false,
     this.height = 280.0,
     this.onExpand,
@@ -51,39 +65,57 @@ class RouteMapView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveOrigin = originName ?? batch?.plantName ?? 'Ahmedabad Plant 01';
-    final effectiveDest = destinationName ?? batch?.projectName ?? 'Gift City Tower B';
-    final effectiveRouteId = activeRouteId ?? batch?.activeRouteId ?? 'route-a';
-
-    // 1. Resolve canonical RouteAssessment
-    final RouteAssessment route = routeAssessment ??
-        RouteService.getRoute(
-          originName: effectiveOrigin,
-          destinationName: effectiveDest,
-          preferredRouteId: effectiveRouteId,
-        );
-
-    // 2. Validate route against selected locations (PRD & Section 7: Route Validation)
-    final bool isRouteValid = RouteService.validateRoute(
-      route: route,
-      originName: effectiveOrigin,
-      destinationName: effectiveDest,
-    );
-
-    final isRouteB = route.routeId == 'route-b';
-    final isCritical = (batch?.riskLevel == RiskLevel.highRisk || batch?.riskLevel == RiskLevel.critical) ||
-        (route.expectedDelayMin > 10.0 || route.etaMinutes > 78.0);
-    final isWatch = (batch?.riskLevel == RiskLevel.watch) || (route.expectedDelayMin > 4.0);
     final isDark = MausamColors.isDark(context);
 
+    // Determine if map is in empty state (Section 16)
+    final bool effectiveEmpty = isEmpty ||
+        (routeAssessment == null &&
+            batch == null &&
+            (originName == null || originName!.isEmpty || destinationName == null || destinationName!.isEmpty));
+
+    if (effectiveEmpty && !isCalculating && !hasError) {
+      return _buildEmptyState(context, isDark);
+    }
+
+    final effectiveOrigin = originName ?? batch?.plantName ?? 'Ahmedabad';
+    final effectiveDest = destinationName ?? batch?.projectName ?? 'Gandhinagar';
+    final effectiveRouteId = activeRouteId ?? batch?.activeRouteId ?? 'route-a';
+
+    final LocationPoint? resolvedOrigin = customOrigin;
+    final LocationPoint? resolvedDest = customDestination;
+
+    // 1. Resolve canonical RouteAssessment
+    final RouteAssessment? route = routeAssessment ??
+        (!effectiveEmpty
+            ? RouteService.getRoute(
+                originName: effectiveOrigin,
+                destinationName: effectiveDest,
+                preferredRouteId: effectiveRouteId,
+                customOrigin: resolvedOrigin,
+                customDestination: resolvedDest,
+              )
+            : null);
+
+    final bool isRouteValid = route != null &&
+        RouteService.validateRoute(
+          route: route,
+          originName: effectiveOrigin,
+          destinationName: effectiveDest,
+        );
+
+    final isRouteB = route?.routeId == 'route-b';
+    final isCritical = (batch?.riskLevel == RiskLevel.highRisk || batch?.riskLevel == RiskLevel.critical) ||
+        (route != null && (route.expectedDelayMin > 10.0 || route.etaMinutes > 78.0));
+    final isWatch = (batch?.riskLevel == RiskLevel.watch) || (route != null && route.expectedDelayMin > 4.0);
+
     final double elapsed = batch?.elapsedMinutes ?? 0.0;
-    final double eta = batch?.etaMinutes ?? route.etaMinutes;
+    final double eta = batch?.etaMinutes ?? route?.etaMinutes ?? 0.0;
     final double totalEstimated = elapsed + eta > 0 ? elapsed + eta : 60.0;
     final double progress = (elapsed / totalEstimated).clamp(0.08, 0.94);
 
-    final double distRemaining = batch?.distanceRemainingKm ?? route.distanceKm;
-    final double ambientTemp = batch?.ambientTempC ?? route.ambientTempC;
-    final double rainProb = batch?.precipitationProb ?? route.precipitationProb;
+    final double distRemaining = batch?.distanceRemainingKm ?? route?.distanceKm ?? 0.0;
+    final double ambientTemp = batch?.ambientTempC ?? route?.ambientTempC ?? 35.0;
+    final double rainProb = batch?.precipitationProb ?? route?.precipitationProb ?? 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -112,7 +144,7 @@ class RouteMapView extends StatelessWidget {
                   size: Size.infinite,
                   painter: _AhmedabadCorridorPainter(
                     route: route,
-                    isDelayZoneActive: isCritical || (route.routeId == 'route-a' && route.expectedDelayMin > 8.0),
+                    isDelayZoneActive: isCritical || (route?.routeId == 'route-a' && (route?.expectedDelayMin ?? 0) > 8.0),
                     progress: progress,
                     isDark: isDark,
                     riskLevel: batch?.riskLevel ?? (isCritical ? RiskLevel.highRisk : (isWatch ? RiskLevel.watch : RiskLevel.safe)),
@@ -121,7 +153,7 @@ class RouteMapView extends StatelessWidget {
                 ),
 
                 // Top-Left Floating Badge: Single minimal route name indicator
-                if (showFloatingHud && !isCalculating)
+                if (showFloatingHud && !isCalculating && !hasError && route != null && isRouteValid)
                   Positioned(
                     top: 10,
                     left: 10,
@@ -161,8 +193,8 @@ class RouteMapView extends StatelessWidget {
                     ),
                   ),
 
-                // Top-Right Floating Badge: Compact Weather Indicator (Section 2.7: 34°C · 0% rain)
-                if (showFloatingHud && !isCalculating)
+                // Top-Right Floating Badge: Compact Weather Indicator
+                if (showFloatingHud && !isCalculating && !hasError && route != null)
                   Positioned(
                     top: 10,
                     right: 10,
@@ -191,8 +223,8 @@ class RouteMapView extends StatelessWidget {
                     ),
                   ),
 
-                // Bottom-Left Floating Badge: Single Distance & ETA Indicator
-                if (showFloatingHud && !isCalculating)
+                // Bottom-Left Floating Badge: Single Distance & ETA Indicator (Section 9)
+                if (showFloatingHud && !isCalculating && !hasError && route != null)
                   Positioned(
                     bottom: 10,
                     left: 10,
@@ -204,7 +236,7 @@ class RouteMapView extends StatelessWidget {
                         border: Border.all(color: MausamColors.brd(context)),
                       ),
                       child: Text(
-                        '${distRemaining.toStringAsFixed(1)} km · ${eta.toInt()}m ETA',
+                        '${distRemaining.toStringAsFixed(1)} km · ${eta.toInt()} min ETA',
                         style: MausamTypography.microOf(context).copyWith(
                           color: MausamColors.txtPrimary(context),
                           fontSize: 10.0,
@@ -215,7 +247,7 @@ class RouteMapView extends StatelessWidget {
                   ),
 
                 // Bottom-Right Floating Button: Compare routes
-                if (onExpand != null && !isCalculating)
+                if (onExpand != null && !isCalculating && !hasError && route != null)
                   Positioned(
                     bottom: 10,
                     right: 10,
@@ -257,7 +289,7 @@ class RouteMapView extends StatelessWidget {
                     ),
                   ),
 
-                // Loading State: CALCULATING ROUTE... (Section 6)
+                // Loading State: Calculating route... (Section 17)
                 if (isCalculating)
                   Container(
                     color: (isDark ? const Color(0xFF0F151C) : Colors.white).withValues(alpha: 0.88),
@@ -286,10 +318,10 @@ class RouteMapView extends StatelessWidget {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'CALCULATING ROUTE...',
+                              'Calculating route...',
                               style: MausamTypography.labelBoldOf(context).copyWith(
                                 fontSize: 12,
-                                letterSpacing: 0.8,
+                                letterSpacing: 0.6,
                                 color: MausamColors.accent,
                               ),
                             ),
@@ -299,17 +331,25 @@ class RouteMapView extends StatelessWidget {
                     ),
                   ),
 
-                // Invalidation State: Route needs to be recalculated (Section 7)
-                if (!isRouteValid && !isCalculating)
+                // Error State: Unable to calculate route (Section 18)
+                if (hasError && !isCalculating)
                   Container(
                     color: (isDark ? const Color(0xFF0F151C) : Colors.white).withValues(alpha: 0.90),
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
                         decoration: BoxDecoration(
                           color: (isDark ? const Color(0xFF131B24) : Colors.white).withValues(alpha: 0.96),
                           borderRadius: BorderRadius.circular(MausamSpacing.radiusControls),
-                          border: Border.all(color: MausamColors.highRisk.withValues(alpha: 0.5)),
+                          border: Border.all(color: MausamColors.highRisk.withValues(alpha: 0.45)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.12),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -317,33 +357,49 @@ class RouteMapView extends StatelessWidget {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(LucideIcons.alertTriangle, size: 16, color: MausamColors.highRisk),
+                                const Icon(LucideIcons.alertTriangle, size: 18, color: MausamColors.highRisk),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Route needs to be recalculated.',
+                                  'Unable to calculate route.',
                                   style: MausamTypography.labelBoldOf(context).copyWith(
-                                    fontSize: 13,
+                                    fontSize: 13.5,
                                     color: MausamColors.highRisk,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
-                              'Plant or Destination selection changed. Updating geometry...',
+                              errorMessage ?? 'Please try another area combination.',
                               style: MausamTypography.microOf(context),
+                              textAlign: TextAlign.center,
                             ),
+                            if (onRetry != null) ...[
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: onRetry,
+                                icon: const Icon(LucideIcons.refreshCw, size: 13),
+                                label: const Text('Retry'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: MausamColors.accent,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     ),
                   ),
+
               ],
             ),
           ),
 
-          // Ultra-Compact Map Legend (Section 2.9: Minimal, non-intrusive)
-          if (showLegend)
+          // Map Legend (Section 2.9)
+          if (showLegend && route != null && !effectiveEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
@@ -387,6 +443,82 @@ class RouteMapView extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, bool isDark) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F151C) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(MausamSpacing.radiusDataSurfaces),
+        border: Border.all(color: MausamColors.brd(context)),
+        boxShadow: MausamSpacing.shadow(context),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Neutral Cartographic Grid (Section 16)
+          CustomPaint(
+            size: Size.infinite,
+            painter: _AhmedabadCorridorPainter(
+              route: null,
+              isDelayZoneActive: false,
+              progress: 0.0,
+              isDark: isDark,
+              riskLevel: RiskLevel.safe,
+            ),
+          ),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              decoration: BoxDecoration(
+                color: (isDark ? const Color(0xFF131B24) : Colors.white).withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(MausamSpacing.radiusControls),
+                border: Border.all(color: MausamColors.brd(context)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: MausamColors.accent.withValues(alpha: 0.12),
+                    ),
+                    child: const Icon(LucideIcons.navigation2, size: 18, color: MausamColors.accent),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Select an origin and destination to view the route.',
+                    style: MausamTypography.bodyMediumOf(context).copyWith(
+                      color: MausamColors.txtPrimary(context),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Choose areas from the dropdowns above to calculate road geometry, distance & ETA.',
+                    style: MausamTypography.microOf(context),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -457,7 +589,7 @@ class RouteMapView extends StatelessWidget {
 }
 
 class _AhmedabadCorridorPainter extends CustomPainter {
-  final RouteAssessment route;
+  final RouteAssessment? route;
   final bool isDelayZoneActive;
   final double progress;
   final bool isDark;
@@ -494,28 +626,20 @@ class _AhmedabadCorridorPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(w, y), gridPaint);
     }
 
-    // Sabarmati Waterway Corridor (Subtle background visual feature, no cluttering labels)
-    final riverPaint = Paint()
-      ..color = (isDark ? const Color(0xFF0C243B) : const Color(0xFFE0F2FE)).withValues(alpha: 0.50)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 12.0
-      ..strokeCap = StrokeCap.round;
-
-    final riverPath = Path()
-      ..moveTo(w * 0.44, 0)
-      ..cubicTo(w * 0.42, h * 0.32, w * 0.36, h * 0.65, w * 0.30, h);
-    canvas.drawPath(riverPath, riverPaint);
+    // Neutral grid early return if no route loaded (Section 16: Empty State)
+    if (route == null) return;
+    final r = route!;
 
     // Location Points resolved dynamically from canonical RouteAssessment
-    final origin = route.originPoint.toOffset(size);
-    final dest = route.destinationPoint.toOffset(size);
+    final origin = r.originPoint.toOffset(size);
+    final dest = r.destinationPoint.toOffset(size);
 
     // Primary Dynamic Spline Path (ONE visually dominant route - Section 2.3)
-    final activePath = _buildSplinePath(route.primaryPathPoints, size);
+    final activePath = _buildSplinePath(r.primaryPathPoints, size);
 
-    // Alternate Dynamic Spline Path (ONLY displayed when explicitly requested - Section 2.3)
-    if (showAlternateRoute && route.alternatePathPoints != null && route.alternatePathPoints!.isNotEmpty) {
-      final altPath = _buildSplinePath(route.alternatePathPoints!, size);
+    // Alternate Dynamic Spline Path
+    if (showAlternateRoute && r.alternatePathPoints != null && r.alternatePathPoints!.isNotEmpty) {
+      final altPath = _buildSplinePath(r.alternatePathPoints!, size);
       final inactivePaint = Paint()
         ..color = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)
         ..style = PaintingStyle.stroke
@@ -533,7 +657,7 @@ class _AhmedabadCorridorPainter extends CustomPainter {
 
       // 1. Draw Traversed Segment (Solid vibrant path)
       final traversedPath = metric.extractPath(0, traversedLength);
-      final activeColor = route.routeId == 'route-b'
+      final activeColor = r.routeId == 'route-b'
           ? MausamColors.safe
           : (isDelayZoneActive ? MausamColors.highRisk : MausamColors.info);
 
@@ -565,10 +689,10 @@ class _AhmedabadCorridorPainter extends CustomPainter {
         _drawDashedPath(canvas, remainingPath, remainingPaint, dashWidth: 6.0, dashSpace: 4.0);
       }
 
-      // 3. Highlight ONE important route problem / bottleneck if active (Section 2.5)
-      if (route.hasBottleneck && isDelayZoneActive) {
-        final bStartRatio = route.bottleneckStart ?? 0.36;
-        final bEndRatio = route.bottleneckEnd ?? 0.64;
+      // 3. Highlight bottleneck zone if active
+      if (r.hasBottleneck && isDelayZoneActive) {
+        final bStartRatio = r.bottleneckStart ?? 0.38;
+        final bEndRatio = r.bottleneckEnd ?? 0.65;
         final bottleneckStart = (totalLength * bStartRatio).clamp(0.0, totalLength);
         final bottleneckEnd = (totalLength * bEndRatio).clamp(0.0, totalLength);
 
@@ -583,21 +707,20 @@ class _AhmedabadCorridorPainter extends CustomPainter {
 
           canvas.drawPath(bottleneckPath, bottleneckPaint);
 
-          // ONE compact callout tag near bottleneck segment (Section 2.5: ⚠ Congestion +14 min)
           final midTangent = metric.getTangentForOffset((bottleneckStart + bottleneckEnd) / 2);
           if (midTangent != null) {
-            final delayMin = route.expectedDelayMin > 0 ? route.expectedDelayMin.toInt() : 14;
+            final delayMin = r.expectedDelayMin > 0 ? r.expectedDelayMin.toInt() : 14;
             _drawCalloutTag(
               canvas,
               midTangent.position + const Offset(0, 16),
-              '⚠ Congestion +$delayMin min',
+              '⚠️ Congestion +$delayMin min',
               MausamColors.highRisk,
             );
           }
         }
       }
 
-      // 4. Draw Truck Position Marker at tangent position (Small, clean, no giant label - Section 2.4)
+      // 4. Draw Truck Position Marker at tangent position
       final truckTangent = metric.getTangentForOffset(traversedLength);
       if (truckTangent != null) {
         _drawTruckMarker(
@@ -610,20 +733,20 @@ class _AhmedabadCorridorPainter extends CustomPainter {
       }
     }
 
-    // Origin Marker (Plant Hub - Section 2.6: Simple marker, short label)
+    // Origin Marker (Plant / Origin Area - Section 6: ● Origin marker)
     _drawHubMarker(
       canvas,
       origin,
-      label: route.origin.shortName,
+      label: r.origin.shortName,
       color: MausamColors.info,
       isOrigin: true,
     );
 
-    // Destination Marker (Project Site - Section 2.6: Simple marker, short label)
+    // Destination Marker (Project Site / Destination Area - Section 6: ● Destination marker)
     _drawHubMarker(
       canvas,
       dest,
-      label: route.destination.shortName,
+      label: r.destination.shortName,
       color: MausamColors.safe,
       isOrigin: false,
     );
@@ -715,12 +838,12 @@ class _AhmedabadCorridorPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
-    // Small clean hub dot
+    // Hub marker circle
     canvas.drawCircle(pos, 7.5, ringPaint);
     canvas.drawCircle(pos, 4.5, fillPaint);
     canvas.drawCircle(pos, 1.8, Paint()..color = Colors.white);
 
-    // Simple single-line label (Section 2.6)
+    // Label
     final labelPainter = TextPainter(
       text: TextSpan(
         text: label,
@@ -748,31 +871,10 @@ class _AhmedabadCorridorPainter extends CustomPainter {
     required bool isHighRisk,
     required Color color,
   }) {
-    // 1. Soft subtle halo (small & clean - Section 2.4)
-    canvas.drawCircle(
-      pos,
-      13.0,
-      Paint()..color = color.withValues(alpha: 0.18),
-    );
+    canvas.drawCircle(pos, 13.0, Paint()..color = color.withValues(alpha: 0.18));
+    canvas.drawCircle(pos, 9.0, Paint()..color = isDark ? const Color(0xFF0F172A) : Colors.white);
+    canvas.drawCircle(pos, 9.0, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2.0);
 
-    // 2. High contrast base circle
-    canvas.drawCircle(
-      pos,
-      9.0,
-      Paint()..color = isDark ? const Color(0xFF0F172A) : Colors.white,
-    );
-
-    // 3. Border ring in state color
-    canvas.drawCircle(
-      pos,
-      9.0,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0,
-    );
-
-    // 4. Directional heading indicator (rotated chevron)
     canvas.save();
     canvas.translate(pos.dx, pos.dy);
     canvas.rotate(angle);
@@ -786,17 +888,15 @@ class _AhmedabadCorridorPainter extends CustomPainter {
 
     canvas.drawPath(arrowPath, Paint()..color = color);
     canvas.restore();
-    // Removed giant TRC-042 label box directly over vehicle (Section 2.4)
   }
 
   @override
-  bool shouldRepaint(covariant _AhmedabadCorridorPainter oldDelegate) =>
-      oldDelegate.route.routeId != route.routeId ||
-      oldDelegate.route.origin.id != route.origin.id ||
-      oldDelegate.route.destination.id != route.destination.id ||
-      oldDelegate.isDelayZoneActive != isDelayZoneActive ||
-      oldDelegate.progress != progress ||
-      oldDelegate.isDark != isDark ||
-      oldDelegate.riskLevel != riskLevel ||
-      oldDelegate.showAlternateRoute != showAlternateRoute;
+  bool shouldRepaint(covariant _AhmedabadCorridorPainter oldDelegate) {
+    return oldDelegate.route != route ||
+        oldDelegate.isDelayZoneActive != isDelayZoneActive ||
+        oldDelegate.progress != progress ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.riskLevel != riskLevel ||
+        oldDelegate.showAlternateRoute != showAlternateRoute;
+  }
 }

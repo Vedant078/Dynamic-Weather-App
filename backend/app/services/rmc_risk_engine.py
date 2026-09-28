@@ -182,6 +182,9 @@ def calculate_delivery_risk(data: Dict[str, Any], ml_model_retention: Optional[f
             "sla_status": "DATA_INSUFFICIENT",
             "worst_material_factor": "DATA INSUFFICIENT: Incomplete input telemetry",
             "is_data_insufficient": True,
+            "financial_impact": None,
+            "estimated_loss_exposure": 0.0,
+            "estimated_avoided_loss": 0.0,
             "model_version": "RMC-CORE-v2.0"
         }
 
@@ -495,6 +498,21 @@ def calculate_delivery_risk(data: Dict[str, Any], ml_model_retention: Optional[f
         worst_material_factor = worst_factors[0] if worst_factors else "Probable batch rejection"
         recommended_action = MitigationAction.CALCULATE_NEW_ROUTE
 
+    # 4. Financial Economics calculation
+    from app.services.financial_service import RmcFinancialEngine
+    volume_m3 = float(data.get("volume_m3", data.get("volume", 6.0)))
+    total_dist = float(data.get("total_distance_km", data.get("distance_km", 25.0)))
+    financial_econ = RmcFinancialEngine.calculate_delivery_economics(
+        volume_m3=volume_m3,
+        concrete_grade=concrete_grade,
+        total_distance_km=total_dist,
+        actual_transit_minutes=total_transit_min,
+        sla_minutes=sla_minutes,
+        outcome="accepted",
+        has_intervention=has_retarder,
+        composite_risk=composite_risk
+    )
+
     return {
         "batch_id": batch_id,
         "predicted_slump_mm": predicted_slump,
@@ -517,5 +535,8 @@ def calculate_delivery_risk(data: Dict[str, Any], ml_model_retention: Optional[f
         "sla_status": sla_status,
         "worst_material_factor": worst_material_factor,
         "is_data_insufficient": False,
+        "financial_impact": financial_econ,
+        "estimated_loss_exposure": financial_econ["estimated_loss_exposure_inr"],
+        "estimated_avoided_loss": financial_econ["avoided_loss_inr"],
         "model_version": "RMC-CORE-v2.0"
     }

@@ -100,7 +100,7 @@ class DeterministicSimulator:
             "risk_level": RiskLevel.SAFE,
             "status": BatchStatus.DELIVERED,
             "active_route_id": "route-b",
-            "narrative": "Batch arrived at Project Site 07. Slump verified at 101.5 mm. Delivery accepted. Avoided financial loss of ₹1.68 Lakhs recorded."
+            "narrative": "Batch arrived at Project Site 07. Slump verified at 101.5 mm. Delivery accepted. Avoided batch loss of ₹71,820 recorded."
         }
     ]
 

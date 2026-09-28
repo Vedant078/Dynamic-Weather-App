@@ -56,6 +56,8 @@ class MausamIcons {
   static const IconData next = LucideIcons.arrowRight;
   static const IconData chevronRight = LucideIcons.chevronRight;
   static const IconData chevronDown = LucideIcons.chevronDown;
+  static const IconData chevronUp = LucideIcons.chevronUp;
+  static const IconData locate = LucideIcons.locate;
   static const IconData close = LucideIcons.x;
   static const IconData check = LucideIcons.check;
   static const IconData search = LucideIcons.search;

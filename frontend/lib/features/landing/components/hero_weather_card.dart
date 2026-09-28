@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/theme/mausam_icons.dart';
 import '../../../models/current_weather.dart';
 import '../../../services/location_service.dart';
 import '../../../state/mausam_state.dart';
@@ -128,13 +128,7 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          !weather.isDay
-                              ? (weather.condition.toLowerCase().contains('cloud')
-                                  ? LucideIcons.cloudMoon
-                                  : LucideIcons.moon)
-                              : (weather.condition.toLowerCase().contains('cloud')
-                                  ? LucideIcons.cloudSun
-                                  : LucideIcons.sun),
+                          !weather.isDay ? MausamIcons.moon : MausamIcons.sun,
                           size: 13,
                           color: !weather.isDay
                               ? const Color(0xFFBAE6FD)
@@ -256,7 +250,7 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
                 ),
                 const SizedBox(width: 4),
                 Icon(
-                  _isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                  _isExpanded ? MausamIcons.chevronUp : MausamIcons.chevronDown,
                   size: 13,
                   color: widget.isDark
                       ? const Color(0xFF94A3B8)
@@ -284,13 +278,13 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
                     _buildSubMetric(
                       'Feels like',
                       '${weather.feelsLike.round()}°C',
-                      LucideIcons.thermometer,
+                      MausamIcons.temperature,
                     ),
                     const SizedBox(width: 8),
                     _buildSubMetric(
                       'Humidity',
                       '${weather.humidity.round()}%',
-                      LucideIcons.droplets,
+                      MausamIcons.humidity,
                     ),
                   ],
                 ),
@@ -300,13 +294,13 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
                     _buildSubMetric(
                       'Wind speed',
                       '${weather.windSpeedKmh.round()} km/h',
-                      LucideIcons.wind,
+                      MausamIcons.wind,
                     ),
                     const SizedBox(width: 8),
                     _buildSubMetric(
                       'Precipitation',
                       '${weather.precipitationProbability.round()}%',
-                      LucideIcons.cloudRain,
+                      MausamIcons.rain,
                     ),
                   ],
                 ),
@@ -343,7 +337,7 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(LucideIcons.locate, size: 10, color: Color(0xFF0284C7)),
+                            Icon(MausamIcons.locate, size: 10, color: Color(0xFF0284C7)),
                             SizedBox(width: 4),
                             Text(
                               'Auto-Detect',
@@ -405,21 +399,21 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
   }
 
   Widget _buildForecastDayColumn(ForecastDay day) {
-    IconData icon = LucideIcons.cloud;
+    IconData icon = MausamIcons.weather;
     Color iconColor = const Color(0xFF64748B);
 
     final cond = day.condition.toLowerCase();
     if (cond.contains('sun') || cond.contains('clear')) {
-      icon = LucideIcons.sun;
+      icon = MausamIcons.sun;
       iconColor = const Color(0xFFF59E0B);
     } else if (cond.contains('rain') || cond.contains('drizzle')) {
-      icon = LucideIcons.cloudRain;
+      icon = MausamIcons.rain;
       iconColor = const Color(0xFF0284C7);
     } else if (cond.contains('wind') || cond.contains('breeze')) {
-      icon = LucideIcons.wind;
+      icon = MausamIcons.wind;
       iconColor = const Color(0xFF0EA5E9);
     } else if (cond.contains('partly')) {
-      icon = LucideIcons.cloudSun;
+      icon = MausamIcons.weather;
       iconColor = const Color(0xFF38BDF8);
     }
 
@@ -551,7 +545,7 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(LucideIcons.cloudOff, size: 36, color: Color(0xFFE11D48)),
+          const Icon(MausamIcons.alert, size: 36, color: Color(0xFFE11D48)),
           const SizedBox(height: 14),
           Text(
             'Weather unavailable',
@@ -573,7 +567,7 @@ class _HeroWeatherCardState extends State<HeroWeatherCard> {
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () => widget.state.refreshHeroWeather(),
-            icon: const Icon(LucideIcons.refreshCw, size: 12),
+            icon: const Icon(MausamIcons.reset, size: 12),
             label: const Text('Retry', style: TextStyle(fontSize: 12)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0284C7),

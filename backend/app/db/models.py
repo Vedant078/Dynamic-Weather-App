@@ -51,6 +51,24 @@ class User(Base):
 
     roles = relationship("Role", secondary=user_roles, back_populates="users", lazy="joined")
     deliveries = relationship("Delivery", back_populates="user", cascade="all, delete-orphan")
+    locations = relationship("Location", back_populates="user", cascade="all, delete-orphan")
+
+
+class Location(Base):
+    __tablename__ = "locations"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization = Column(String, nullable=True, index=True)
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)  # "PLANT", "PROJECT_SITE", "DESTINATION"
+    address = Column(String, nullable=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    user = relationship("User", back_populates="locations")
 
 
 class Delivery(Base):

@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from app.db.session import SessionLocal
-from app.db.models import User, Role, Delivery, DeliveryRiskResult, Telemetry
+from app.db.models import User, Role, Delivery, DeliveryRiskResult, Telemetry, Location
 from app.repositories.user_repository import UserRepository, STANDARD_ROLES
 from app.config import settings
 from app.ml.model import model_manager
@@ -38,6 +38,78 @@ def seed_database():
                 r_obj = db.query(Role).filter(Role.id == rid).first()
                 if r_obj and r_obj not in user.roles:
                     user.roles.append(r_obj)
+            db.commit()
+
+        # Seed Demo Locations for demo user
+        loc_count = db.query(Location).filter(Location.user_id == user.id).count()
+        if loc_count == 0:
+            logger.info("Seeding demo operational locations...")
+            demo_locs = [
+                Location(
+                    user_id=user.id,
+                    organization=user.organization_name,
+                    name="Ahmedabad Central Batching Plant (Naroda)",
+                    type="PLANT",
+                    address="GIDC Naroda Industrial Estate, Ahmedabad",
+                    latitude=23.0650,
+                    longitude=72.6500,
+                ),
+                Location(
+                    user_id=user.id,
+                    organization=user.organization_name,
+                    name="Ahmedabad Sanand Batching Plant 02",
+                    type="PLANT",
+                    address="Sanand GIDC II, Ahmedabad West",
+                    latitude=22.9850,
+                    longitude=72.3780,
+                ),
+                Location(
+                    user_id=user.id,
+                    organization=user.organization_name,
+                    name="Gandhinagar Infocity Batching Plant 03",
+                    type="PLANT",
+                    address="Koba-Gandhinagar Expressway, Sector 26",
+                    latitude=23.1950,
+                    longitude=72.6350,
+                ),
+                Location(
+                    user_id=user.id,
+                    organization=user.organization_name,
+                    name="GIFT City Tower B Expansion",
+                    type="PROJECT_SITE",
+                    address="Block 14, Zone 1, GIFT City, Gandhinagar",
+                    latitude=23.1600,
+                    longitude=72.6850,
+                ),
+                Location(
+                    user_id=user.id,
+                    organization=user.organization_name,
+                    name="Metro Pier 142 - Thaltej Corridor",
+                    type="PROJECT_SITE",
+                    address="Drive-In Road / SG Highway Junction, Thaltej",
+                    latitude=23.0510,
+                    longitude=72.5180,
+                ),
+                Location(
+                    user_id=user.id,
+                    organization=user.organization_name,
+                    name="Sabarmati Riverfront Phase 2",
+                    type="PROJECT_SITE",
+                    address="West Promenade, Riverfront North, Ahmedabad",
+                    latitude=23.0320,
+                    longitude=72.5740,
+                ),
+                Location(
+                    user_id=user.id,
+                    organization=user.organization_name,
+                    name="SP Ring Road Logistics Hub",
+                    type="DESTINATION",
+                    address="Sardar Patel Ring Road Junction 7",
+                    latitude=23.1150,
+                    longitude=72.5480,
+                ),
+            ]
+            db.add_all(demo_locs)
             db.commit()
 
         # 3. Seed Realistic RMC Deliveries if none exist

@@ -23,6 +23,10 @@ class DeliveryOrderDraft {
   final double? plannedTransitMinutes;
   final double? expectedDelayMin;
   final String? operatorNotes;
+  final double? plantLat;
+  final double? plantLng;
+  final double? projectLat;
+  final double? projectLng;
 
   // Backwards-compatible aliases
   String get desiredDeliveryTime => dispatchTime;
@@ -49,6 +53,10 @@ class DeliveryOrderDraft {
     this.plannedTransitMinutes,
     this.expectedDelayMin,
     this.operatorNotes,
+    this.plantLat,
+    this.plantLng,
+    this.projectLat,
+    this.projectLng,
   });
 
   DeliveryOrderDraft copyWith({
@@ -73,6 +81,10 @@ class DeliveryOrderDraft {
     double? plannedTransitMinutes,
     double? expectedDelayMin,
     String? operatorNotes,
+    double? plantLat,
+    double? plantLng,
+    double? projectLat,
+    double? projectLng,
   }) {
     return DeliveryOrderDraft(
       batchCode: batchCode ?? this.batchCode,
@@ -95,6 +107,10 @@ class DeliveryOrderDraft {
       plannedTransitMinutes: plannedTransitMinutes ?? this.plannedTransitMinutes,
       expectedDelayMin: expectedDelayMin ?? this.expectedDelayMin,
       operatorNotes: operatorNotes ?? this.operatorNotes,
+      plantLat: plantLat ?? this.plantLat,
+      plantLng: plantLng ?? this.plantLng,
+      projectLat: projectLat ?? this.projectLat,
+      projectLng: projectLng ?? this.projectLng,
     );
   }
 
@@ -126,6 +142,10 @@ class DeliveryOrderDraft {
       'planned_transit_minutes': plannedTransitMinutes,
       'expected_delay_min': expectedDelayMin,
       'operator_notes': operatorNotes,
+      if (plantLat != null) 'plant_lat': plantLat,
+      if (plantLng != null) 'plant_lng': plantLng,
+      if (projectLat != null) 'project_lat': projectLat,
+      if (projectLng != null) 'project_lng': projectLng,
     };
   }
 }
@@ -213,7 +233,7 @@ class DeliveryRiskAssessment {
       primaryDriver: json['primary_driver'] as String? ?? 'Within operational tolerance',
       contributingFactors: (json['contributors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       recommendedAction: json['recommended_action'] as String?,
-      estimatedLossExposure: (json['estimated_loss_exposure'] as num?)?.toDouble() ?? 168000.0,
+      estimatedLossExposure: (json['estimated_loss_exposure'] as num?)?.toDouble() ?? 0.0,
       predictedTransitMinutes: (json['planned_transit_minutes'] as num?)?.toDouble() ??
           (json['predicted_transit_minutes'] as num?)?.toDouble() ?? 52.0,
       etaDelayMinutes: (json['expected_delay_min'] as num?)?.toDouble() ??

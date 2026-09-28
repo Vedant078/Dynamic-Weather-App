@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.db.models import Delivery, DeliveryRiskResult, Telemetry, User
 from app.repositories.delivery_repository import DeliveryRepository
 from app.services.rmc_model_service import rmc_model_service
+from app.services.routing_service import RoutingService
 from app.api.deps import require_role
 from app.models.schemas import (
     BatchDetail, BatchCreate, BatchStatus, RiskLevel,
@@ -186,8 +187,8 @@ def create_delivery(
         "elapsed_minutes": 0.0,
         "eta_minutes": planned_transit,
         "original_eta_minutes": planned_transit,
-        "distance_remaining_km": 28.5,
-        "total_distance_km": 28.5,
+        "distance_remaining_km": round(max(1.0, RoutingService.haversine_km(req.plant_lat or 23.0225, req.plant_lng or 72.5714, req.project_lat or 23.2156, req.project_lng or 72.6369) * 1.28), 1),
+        "total_distance_km": round(max(1.0, RoutingService.haversine_km(req.plant_lat or 23.0225, req.plant_lng or 72.5714, req.project_lat or 23.2156, req.project_lng or 72.6369) * 1.28), 1),
         "traffic_index": 0.35,
         "precipitation_prob": 0.0,
         "status": "DISPATCHED",

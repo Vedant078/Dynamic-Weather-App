@@ -40,7 +40,8 @@ class Settings(BaseSettings):
     DEFAULT_PROJECT_NAME: str = "Project Site 07 (Gift City Expansion)"
 
     # Financial defaults
-    DEFAULT_LOSS_PER_REJECTED_M3_INR: float = 40166.67  # ~2.41 Lakhs for 6 m3
+    DEFAULT_MATERIAL_RATE_PER_M3_INR: float = 4800.0
+    DEFAULT_TRANSPORT_RATE_PER_KM_INR: float = 75.0
     
     model_config = {
         "extra": "ignore",

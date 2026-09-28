@@ -20,23 +20,31 @@ def record_batch_outcome(batch_id: str, req: OutcomeRecordRequest):
 
     initial_slump = batch.get("initial_slump_mm", 110.0)
     variance_mm = round(req.site_slump_mm - initial_slump, 1)
-    
-    # Financial calculation (PRD.md Section 3.3 & Appendix C)
+
+    from app.services.financial_service import RmcFinancialEngine
+    vol = float(batch.get("volume_m3", 6.0))
+    grade = str(batch.get("concrete_grade", "M35"))
+    dist = float(batch.get("total_distance_km", 25.0))
+    has_int = (batch.get("active_route_id") == "route-b" or "retarder" in str(batch.get("risk_factors", [])))
+
+    fin = RmcFinancialEngine.calculate_delivery_economics(
+        volume_m3=vol,
+        concrete_grade=grade,
+        total_distance_km=dist,
+        actual_transit_minutes=req.actual_transit_minutes,
+        outcome=req.outcome,
+        has_intervention=has_int
+    )
+    fin_impact = fin["financial_impact_inr"]
+    fin_type = fin["financial_type"]
+
     if req.outcome == "rejected":
-        # Full volume loss
-        fin_impact = batch.get("volume_m3", 6.0) * 40166.67
-        fin_type = "MATERIAL_LOSS"
         quality_grade = "REJECTED_UNUSABLE"
         new_status = BatchStatus.REJECTED
     elif req.outcome == "accepted_with_warning":
-        fin_impact = 4200.0  # Minor admixture / testing cost
-        fin_type = "NOMINAL_COST"
         quality_grade = "ACCEPTABLE_SUB_OPTIMAL"
         new_status = BatchStatus.DELIVERED
     else:
-        # Avoided loss through proactive decision
-        fin_impact = 168000.0
-        fin_type = "AVOIDED_LOSS"
         quality_grade = "HIGH_SPEC_DELIVERY"
         new_status = BatchStatus.DELIVERED
 

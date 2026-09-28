@@ -341,11 +341,12 @@ def test_rbac_workspaces_endpoint_and_isolation():
 
     # 2. Register New User 1
     u1_email = f"user1_{uuid.uuid4().hex[:6]}@example.com"
+    org1 = f"Org-Alpha-{uuid.uuid4().hex[:6]}"
     reg1 = client.post("/auth/register", json={
         "email": u1_email,
         "password": "Password123!",
         "name": "Test User 1",
-        "organization": "Org Alpha"
+        "organization": org1
     })
     assert reg1.status_code == 201
     tok1 = reg1.json()["access_token"]
@@ -391,11 +392,12 @@ def test_rbac_workspaces_endpoint_and_isolation():
 
     # 4. Register New User 2 in separate organization
     u2_email = f"user2_{uuid.uuid4().hex[:6]}@example.com"
+    org2 = f"Org-Beta-{uuid.uuid4().hex[:6]}"
     reg2 = client.post("/auth/register", json={
         "email": u2_email,
         "password": "Password123!",
         "name": "Test User 2",
-        "organization": "Org Beta"
+        "organization": org2
     })
     assert reg2.status_code == 201
     tok2 = reg2.json()["access_token"]

@@ -4,6 +4,7 @@ import '../models/persona.dart';
 import '../models/batch.dart';
 import '../models/route_option.dart';
 import '../models/delivery_outcome.dart';
+import '../models/saved_location.dart';
 import 'mock_data_service.dart';
 
 class ApiService {
@@ -328,7 +329,14 @@ class ApiService {
       }
     } catch (_) {}
 
-    final finImpact = outcome == 'rejected' ? 241000.0 : 168000.0;
+    // Dynamic economic fallback (M35 benchmark: ₹5,300/m³ for standard 6m³ batch)
+    const double vol = 6.0;
+    const double rate = 5300.0;
+    final finImpact = outcome == 'rejected'
+        ? (vol * rate * 2.0 + 25.0 * 75.0 + vol * 850.0)
+        : (outcome == 'accepted_with_warning' ? 3500.0 : (vol * rate * 2.0 - 1500.0));
+    final finType = outcome == 'rejected' ? 'MATERIAL_LOSS' : (outcome == 'accepted_with_warning' ? 'NOMINAL_COST' : 'AVOIDED_LOSS');
+
     return DeliveryOutcomeModel(
       outcomeId: 'outcome-$batchId',
       batchId: batchId,
@@ -336,7 +344,7 @@ class ApiService {
       qualityGrade: outcome == 'rejected' ? 'REJECTED_UNUSABLE' : 'HIGH_SPEC_DELIVERY',
       slumpVarianceMm: siteSlumpMm - 110.0,
       financialImpactInr: finImpact,
-      financialType: outcome == 'rejected' ? 'MATERIAL_LOSS' : 'AVOIDED_LOSS',
+      financialType: finType,
       mlTrainingRecorded: true,
       recordedAt: DateTime.now().toIso8601String(),
     );
@@ -355,4 +363,81 @@ class ApiService {
     } catch (_) {}
     return {'current_step': stepIdx};
   }
+
+  // =========================================================================
+  // LOCATION APIs (CRUD with tenant isolation)
+  // =========================================================================
+
+  Future<List<SavedLocation>> fetchLocations({String? type}) async {
+    try {
+      final uri = type != null
+          ? Uri.parse('$baseUrl/locations?type=$type')
+          : Uri.parse('$baseUrl/locations');
+
+      final response = await _client.get(
+        uri,
+        headers: _buildHeaders(isJson: true),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        return list.map((item) => SavedLocation.fromJson(item as Map<String, dynamic>)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<SavedLocation?> createLocation({
+    required String name,
+    required String type,
+    String? address,
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$baseUrl/locations'),
+        headers: _buildHeaders(isJson: true),
+        body: jsonEncode({
+          'name': name.trim(),
+          'type': type.trim().toUpperCase(),
+          if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+          'latitude': latitude,
+          'longitude': longitude,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return SavedLocation.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<bool> deleteLocation(String id) async {
+    try {
+      final response = await _client.delete(
+        Uri.parse('$baseUrl/locations/$id'),
+        headers: _buildHeaders(isJson: true),
+      ).timeout(const Duration(seconds: 4));
+
+      return response.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
+
+  Future<Map<String, dynamic>?> geocodeAddress(String address) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$baseUrl/locations/geocode?address=${Uri.encodeComponent(address.trim())}'),
+        headers: _buildHeaders(isJson: true),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
 }
+

@@ -162,13 +162,25 @@ class FleetAnalyticsScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                _buildBarRow(context, 'Traffic congestion & bottleneck delay', 0.44, '44%', MausamColors.highRisk),
-                const SizedBox(height: 10),
-                _buildBarRow(context, 'Midday solar heat exposure (>38°C)', 0.32, '32%', MausamColors.watch),
-                const SizedBox(height: 10),
-                _buildBarRow(context, 'Sub-optimal corridor routing', 0.14, '14%', MausamColors.info),
-                const SizedBox(height: 10),
-                _buildBarRow(context, 'Precipitation front / rain risk', 0.10, '10%', MausamColors.txtMuted(context)),
+                if (batches.isEmpty && outcomes.isEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(
+                      child: Text(
+                        'No operational risk incidents logged yet (awaiting active batches).',
+                        style: MausamTypography.microOf(context).copyWith(color: MausamColors.txtMuted(context)),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  _buildBarRow(context, 'Traffic congestion & bottleneck delay', 0.44, '44%', MausamColors.highRisk),
+                  const SizedBox(height: 10),
+                  _buildBarRow(context, 'Midday solar heat exposure (>38°C)', 0.32, '32%', MausamColors.watch),
+                  const SizedBox(height: 10),
+                  _buildBarRow(context, 'Sub-optimal corridor routing', 0.14, '14%', MausamColors.info),
+                  const SizedBox(height: 10),
+                  _buildBarRow(context, 'Precipitation front / rain risk', 0.10, '10%', MausamColors.txtMuted(context)),
+                ],
               ],
             ),
           ),
@@ -202,13 +214,32 @@ class FleetAnalyticsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
                 if (outcomes.isEmpty) ...[
-                  _buildOutcomeItem(context, 'RMC-204', '34.0°C', '66 min', '101.5 mm', 'ACCEPTED'),
-                  Divider(color: MausamColors.brdSubtle(context), height: 16),
-                  _buildOutcomeItem(context, 'RMC-198', '34.8°C', '72 min', '98.0 mm', 'ACCEPTED'),
-                  Divider(color: MausamColors.brdSubtle(context), height: 16),
-                  _buildOutcomeItem(context, 'RMC-195', '33.2°C', '54 min', '105.0 mm', 'ACCEPTED'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24.0),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.clipboardList, size: 28, color: MausamColors.txtMuted(context)),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No delivery history yet',
+                            style: MausamTypography.bodyMediumOf(context).copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: MausamColors.txtSecondary(context),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Verified quality audits and financial metrics appear upon delivery completion.',
+                            style: MausamTypography.microOf(context),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ] else ...[
                   ...outcomes.map(
                     (o) {

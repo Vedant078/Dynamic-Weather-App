@@ -42,7 +42,10 @@ void main() {
       expect(find.text('1013 hPa'), findsNothing);
 
       // Verify template elements from reference are present (5-day forecast row)
-      expect(find.text('Mon'), findsWidgets);
+      expect(
+        find.byWidgetPredicate((w) => w is Text && ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].contains(w.data)),
+        findsWidgets,
+      );
       expect(find.text('More details'), findsOneWidget);
     });
 
