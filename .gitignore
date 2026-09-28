@@ -52,3 +52,5 @@ frontend/coverage/
 *.iml
 *.ipr
 *.iws
+.vercel
+.env*
