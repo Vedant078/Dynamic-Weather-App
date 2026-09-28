@@ -1,11 +1,11 @@
 {
-    "name": "mausam",
-    "short_name": "mausam",
+    "name": "mausam_dynamic_weather",
+    "short_name": "mausam_dynamic_weather",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "mausam_dynamic_weather — Dynamic Weather & Environmental Decision Intelligence",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

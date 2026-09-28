@@ -51,7 +51,7 @@ class _MausamAppState extends State<MausamApp> {
       animation: _state,
       builder: (context, _) {
         return MaterialApp.router(
-          title: 'MAUSAM — Environmental Decision Intelligence',
+          title: 'mausam_dynamic_weather',
           debugShowCheckedModeBanner: false,
           theme: MausamTheme.lightTheme,
           darkTheme: MausamTheme.darkTheme,
